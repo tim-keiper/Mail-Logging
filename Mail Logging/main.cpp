@@ -1,8 +1,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <regex>
 #include <fstream>
 #include <sstream> // For stringstream to parse lines
+#include <cstdlib> // For system()
 
 using namespace std;
 
@@ -98,6 +100,7 @@ int main() {
 
 // Function implementations
 
+// Function to validate if the recipient exists in the list
 bool isRecipientValid(const string& recipientName, const vector<Resident>& residents) {
     for (const auto& resident : residents) {
         if (resident.name == recipientName) {
@@ -107,15 +110,45 @@ bool isRecipientValid(const string& recipientName, const vector<Resident>& resid
     return false;
 }
 
+// Function to send an email notification to the recipient
 void sendEmailNotification(const Resident& recipient) {
-    cout << "\nSending email notification to: " << recipient.email << endl;
-    cout << "Subject: Mail Arrival Notification\n";
-    cout << "Dear " << recipient.name << ",\n";
-    cout << "Your mail has arrived and is ready for pickup.\n";
-    cout << "Best regards,\nYour Mail System\n";
+    // Sender's credentials (You can use environment variables or a config file for security)
+    std::string senderEmail = "tkeiper86@gmail.com";  // Replace with your email
+    std::string appPassword = "woak ubup hkir hbbf";    // Replace with your app password (Google or email service)
+
+    // Email content
+    std::string subject = "Mail Arrival Notification";
+    std::string body = "Dear " + recipient.name + ",\n\nYour mail has arrived and is ready for pickup.\n\nBest regards,\nYour Mail System";
+
+    // Create the email content
+    std::string emailContent = "To: " + recipient.email + "\n"
+        "From: " + senderEmail + "\n"
+        "Subject: " + subject + "\n\n"
+        + body;
+
+    // Write email content to a temporary file
+    std::ofstream emailFile("email.txt");
+    emailFile << emailContent;
+    emailFile.close();
+
+    // Create a temporary variable to hold the modified email (without leading/trailing spaces)
+    std::string trimmedEmail = std::regex_replace(recipient.email, std::regex("^\\s+|\\s+$"), "");
+
+    // Send the email using curl command with proper formatting
+    std::string curlCommand = "curl -s --url \"smtp://smtp.gmail.com:587\" --ssl-reqd "
+        "--mail-from \"" + senderEmail + "\" --mail-rcpt \"" + trimmedEmail + "\" "
+        "--upload-file \"email.txt\" --user \"" + senderEmail + ":" + appPassword + "\"";
+
+    // Run curl via system()
+    system(curlCommand.c_str());
+
+    // Clean up temporary email file
+    std::remove("email.txt");
+
+    std::cout << "Email sent to " << recipient.name << " at " << trimmedEmail << std::endl;
 }
 
-// Load recipients from a file (e.g., recipients.txt)
+// Function to load recipients from a file (e.g., "recipients.txt")
 void loadRecipientsFromFile(const string& filename, vector<Resident>& residents) {
     ifstream file(filename);
     if (!file.is_open()) {
@@ -125,10 +158,10 @@ void loadRecipientsFromFile(const string& filename, vector<Resident>& residents)
 
     string line;
     while (getline(file, line)) {
-        stringstream ss(line);
         string name, email;
 
         // Assuming the name and email are separated by a comma
+        stringstream ss(line);
         if (getline(ss, name, ',') && getline(ss, email)) {
             Resident newResident = { name, email };
             residents.push_back(newResident);
@@ -138,7 +171,7 @@ void loadRecipientsFromFile(const string& filename, vector<Resident>& residents)
     file.close();
 }
 
-// Save the mail log to a file (append mode)
+// Function to save the mail log to a file (append mode)
 void saveMailLogToFile(const vector<Mail>& mailLog) {
     ofstream file("mail_log.txt", ios::app); // Open file in append mode
     if (!file.is_open()) {
